@@ -3,17 +3,11 @@
 
 #include <inttypes.h>
 
-/* 6 bytes per key */
-typedef struct rolla_entry {
-    unsigned short pfx;
-    uint32_t offset;
-} rolla_entry;
+#define NUMBUCKETS 8192
 
 /* XXX locking? */
 typedef struct rolla {
-    rolla_entry *ent;
-    uint16_t count;
-    uint16_t alloc;
+    uint32_t offsets[NUMBUCKETS];
     int mapfd;
     char *path;
     uint8_t *map;

@@ -18,44 +18,17 @@ static uint32_t jenkins_one_at_a_time_hash(char *key, size_t len);
 #define hash jenkins_one_at_a_time_hash
 
 static uint32_t rolla_index_lookup(rolla *r, char *key) {
-    uint32_t fh = hash(key, strlen(key));
-    uint16_t h = fh & 0xffff;
-
-    int i;
-
-    for (i=0; i < r->count; i++) {
-        if (r->ent[i].pfx == h) {
-            return r->ent[i].offset;
-        }
-    }
-
-    return NO_BACKTRACE;
+    uint32_t fh = hash(key, strlen(key)) % NUMBUCKETS;
+    return r->offsets[fh];
 }
 
 static uint32_t rolla_index_keyval(rolla *r, char *key, uint32_t off) {
-    uint32_t fh = hash(key, strlen(key));
-    uint16_t h = fh & 0xffff;
+    uint32_t fh = hash(key, strlen(key)) % NUMBUCKETS;
 
-    int i;
+    uint32_t last = r->offsets[fh];
+    r->offsets[fh] = off;
 
-    for (i=0; i < r->count; i++) {
-        if (r->ent[i].pfx == h) {
-            uint32_t save = r->ent[i].offset;
-            r->ent[i].offset = off;
-            return save;
-        }
-    }
-
-    if (i == r->alloc) {
-        r->alloc += 1024;
-        r->ent = realloc(r->ent, r->alloc * sizeof(rolla_entry));
-    }
-
-    r->ent[i].pfx = h;
-    r->ent[i].offset = off;
-    r->count++;
-
-    return NO_BACKTRACE;
+    return last;
 }
 
 static void rolla_load(rolla *r) {
@@ -122,10 +95,8 @@ rolla * rolla_create(char *path) {
     rolla *r = realloc(NULL, sizeof(rolla));
     r->path = malloc(strlen(path) + 1);
     strcpy(r->path, path);
-    r->count = 0;
-    r->alloc = 0;
     r->mmap_alloc = 0;
-    r->ent = NULL;
+    memset(r->offsets, 0xff, NUMBUCKETS * sizeof(uint32_t));
 
     rolla_load(r);
 
@@ -161,7 +132,7 @@ void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen) {
         msync(r->map, r->mmap_alloc, MS_SYNC);
         int s = munmap(r->map, r->mmap_alloc);
         assert(!s);
-        r->mmap_alloc += (r->eof + step + MMAP_OVERFLOW);
+        r->mmap_alloc += (r->eof + step) * 4;
         s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
         assert(!s);
         r->map = (uint8_t *)mmap(
@@ -191,10 +162,10 @@ void rolla_iter(rolla *r, rolla_iter_cb cb, void *passthrough) {
 
     int sl = 10 * 1024;
     char *s = realloc(NULL, sl);
-    for (i = 0; i < r->count; i++) {
+    for (i = 0; i < NUMBUCKETS; i++) {
         uint32_t search_off = 0;
         s[0] = 0;
-        uint32_t off = r->ent[i].offset;
+        uint32_t off = r->offsets[i];
         char buf[258];
         buf[0] = 1;
         while (off != NO_BACKTRACE) {
@@ -244,8 +215,7 @@ void rolla_close(rolla *r, int compress) {
 
     munmap(r->map, r->mmap_alloc);
     close(r->mapfd);
-    free(r->ent);
-    
+
     if (compress) {
         rename(path, r->path);
     }
