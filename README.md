@@ -49,6 +49,45 @@ Design
 
 TBD
 
+Benchmarks
+----------
+
+**Hardware**
+
+    VMWare Fusion
+    Arch Linux 3.3.7-1-ARCH #1 SMP PREEMPT x64
+    Intel(R) Core(TM) i7-2677M CPU @ 1.80GHz
+    Crucial 256GB SSD
+    1.4GB RAM (likely on-disk file fully in page cache)
+
+**Data**
+
+    Keys and values are 1-6 bytes [1..1000000].
+
+**Test 1**
+
+    NUMBUCKETS=8192
+    100,000 writes, and 100,000 reads
+    writes 3609742.327/s
+    reads  4034846.852/s
+    (note: this is the sweet spot for this library)
+
+**Test 2**
+
+    NUMBUCKETS=8192
+    1,000,000 writes, and 1,000,000 reads
+    writes 5558771.063/s
+    reads   621547.615/s
+    (note: too few buckets, too much chaining)
+
+**Test 3**
+
+    NUMBUCKETS=262144
+    1,000,000 writes, and 1,000,000 reads
+    writes 4818579.943/s
+    reads  3342098.868/s
+    (note: less chaining and more req'd ram.. ~1MB)
+
 Author
 ------
 

@@ -7,6 +7,9 @@
 
 #include "rolla.h"
 
+#define COUNT 1000000
+#define DCOUNT ((double)COUNT)
+
 double doublenow() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -28,18 +31,20 @@ int main() {
     printf("-- write --\n");
 
     start = doublenow();
-    for (i=0; i < 1000000; i++) {
+    for (i=0; i < COUNT; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         rolla_set(db, buf2, (uint8_t *)buf2, 8);
     }
-    printf("write took %.3f\n",
-    doublenow() - start);
-    sleep(8);
+    double final;
+    final = doublenow();
+    printf("write took %.3f (%.3f/s)\n",
+    final - start, DCOUNT / (final - start));
+    sleep(3);
 
     printf("-- read --\n");
     uint32_t sz;
     start = doublenow();
-    for (i=0; i < 1000000; i++) {
+    for (i=0; i < COUNT; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         char *p = (char *)rolla_get(db, buf2, &sz);
         assert(p && !strcmp(buf2, p));
@@ -47,10 +52,9 @@ int main() {
         if (i % 100000 == 0)
             printf("%d\n", i);
     }
-    printf("read took %.3f\n",
-    doublenow() - start);
-
-    sleep(8);
+    final = doublenow();
+    printf("read took %.3f (%.3f/s)\n",
+    final - start, DCOUNT / (final - start));
 
     snprintf(buf2, 8, "%d", 4);
     char *p = (char *)rolla_get(db, buf2, &sz);
