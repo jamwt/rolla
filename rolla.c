@@ -125,6 +125,11 @@ uint8_t * rolla_get(rolla *r, char *key, uint32_t *len) {
     return NULL;
 }
 
+void rolla_sync(rolla *r) {
+    int s = msync(r->map, r->mmap_alloc, MS_SYNC);
+    assert(!s);
+}
+
 void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen) {
     uint8_t klen = strlen(key) + 1;
     uint32_t step = 9 + klen + vlen;

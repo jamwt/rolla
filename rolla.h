@@ -26,6 +26,7 @@ typedef struct rolla {
 } rolla;
 
 rolla * rolla_create(char *path);
+void rolla_sync(rolla *r);
 void rolla_close(rolla *r, int compress);
 
 void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen);
