@@ -193,7 +193,6 @@ void rolla_iter(rolla *r, rolla_iter_cb cb, void *passthrough) {
     }
 
     free(s);
-
 }
 
 static void rolla_rewrite_cb(rolla *r, char *key, uint8_t *data, uint32_t length, void *pass) {
