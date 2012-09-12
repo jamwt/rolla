@@ -24,22 +24,24 @@ Features
 Caveats
 -------
 
- * `rolla` is **NOT THREAD SAFE** .  If you want to access `rolla`
-   databases in a multithreaded environment, you'll have to serialize
-   access in a higher layer.
+ * `rolla` databases are **NOT THREAD SAFE**.  If you want to access a
+  `rolla` database from multiple threads concurrently, you'll have to
+   serialize access in a higher layer.  The library is fully
+   re-entrant, however--so you can use *different* databases
+   in multiple threads concurrently.
  * Keys are null-terminated C-Strings, not bytestrings
  * Keys must be <=255 bytes
- * An entire database cannot exceed sizeof(uint32_t) 4GB
- * Misses are expensive (they must read approx 1/256th of the database
+ * An entire database cannot exceed 4GB
+ * Misses are expensive (they must read approx 1/8192 of the database
    off disk to invalidate the key)
- * Compaction only happens when the database is destroyed and reloaded,
-   it cannot be compacted while online
+ * Compaction only happens when the database is closed and reloaded,
+   it cannot be done while online
  * Files are assumed little endian and are not portable across
    architectures of different byte orderings
- * `rolla` does not call `fsync()`, but instead relies on the operating
-   system's schedule.  Some data that was not totally committed to
-   the backing hardware could be lost if system failure happened
-   (though the database will come up cleanly with a subset of
+ * `rolla` does not call `fsync()` or `msync()`, but instead relies on
+   the operating system's schedule.  Some data that was not totally
+   committed to the backing hardware could be lost if system failure
+   happened (though the database will come up cleanly with a subset of
    records, "repair" is never necessary)
 
 Design
