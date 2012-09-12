@@ -7,34 +7,39 @@
 
 #include "rolla.h"
 
-int main() {
-    printf("-- load --\n");
+double doublenow() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
-    rolla *db = rolla_create("db");
-    gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
 
+    return (double)tv.tv_sec 
+        + (((double)tv.tv_usec) / 1000000.0);
+}
+
+int main() {
+    double start;
+    printf("-- load --\n");
+    start = doublenow();
+    rolla *db = rolla_create("db");
+    printf("load took %.3f\n", 
+    doublenow() - start);
 
     int i;
     char buf2[8] = {0};
     printf("-- write --\n");
-    gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
-    for (i=0; i < 100000; i++) {
+    
+    start = doublenow();
+    for (i=0; i < 1000000; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         rolla_set(db, buf2, (uint8_t *)buf2, 8);
     }
-    gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
+    printf("write took %.3f\n", 
+    doublenow() - start);
     sleep(8);
 
     printf("-- read --\n");
     uint32_t sz;
-    gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
-    for (i=0; i < 100000; i++) {
+    start = doublenow();
+    for (i=0; i < 1000000; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         char *p = (char *)rolla_get(db, buf2, &sz);
         assert(p && !strcmp(buf2, p));
@@ -42,8 +47,8 @@ int main() {
         if (i % 100000 == 0)
             printf("%d\n", i);
     }
-    gettimeofday(&tv, NULL);
-    printf("%u/%u\n", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec);
+    printf("read took %.3f\n", 
+    doublenow() - start);
 
     sleep(8);
 
