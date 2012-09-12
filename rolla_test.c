@@ -28,7 +28,7 @@ int main() {
     printf("-- write --\n");
     
     start = doublenow();
-    for (i=0; i < 1000000; i++) {
+    for (i=0; i < 10000000; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         rolla_set(db, buf2, (uint8_t *)buf2, 8);
     }
@@ -39,7 +39,7 @@ int main() {
     printf("-- read --\n");
     uint32_t sz;
     start = doublenow();
-    for (i=0; i < 1000000; i++) {
+    for (i=0; i < 10000000; i++) {
         snprintf(buf2, 8, "%d", i % 2 ? i : 4);
         char *p = (char *)rolla_get(db, buf2, &sz);
         assert(p && !strcmp(buf2, p));

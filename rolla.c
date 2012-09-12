@@ -87,7 +87,7 @@ static void rolla_load(rolla *r) {
 
     r->map = (uint8_t *)mmap(
         NULL, r->mmap_alloc, PROT_READ | PROT_WRITE, MAP_SHARED, r->mapfd, 0);
-    
+
     assert(r->map);
 }
 

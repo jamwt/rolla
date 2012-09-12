@@ -3,9 +3,18 @@
 
 #include <inttypes.h>
 
-#define NUMBUCKETS 8192
+/* The whole system swings on this parameter...
 
-/* XXX locking? */
+Set it to something large (128k to 256k buckets)
+for something with tens of millions of keys.
+256k will need at least ~1MB per database.
+
+Keep it small (8k) for very good performance with
+low memory overhead (<40kB) on embedded systems
+with less than 1M keys.
+*/
+#define NUMBUCKETS (1024 * 8)
+
 typedef struct rolla {
     uint32_t offsets[NUMBUCKETS];
     int mapfd;
