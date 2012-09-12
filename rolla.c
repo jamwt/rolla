@@ -137,7 +137,7 @@ void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen) {
         msync(r->map, r->mmap_alloc, MS_SYNC);
         int s = munmap(r->map, r->mmap_alloc);
         assert(!s);
-        r->mmap_alloc += (r->eof + step) * 4;
+        r->mmap_alloc += (r->eof + step) * 2;
         s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
         assert(!s);
         r->map = (uint8_t *)mmap(
