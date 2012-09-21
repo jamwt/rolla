@@ -183,8 +183,10 @@ void rolla_iter(rolla *r, rolla_iter_cb cb, void *passthrough) {
             if (!strstr(s, buf)) {
                 /* not found */
                 uint32_t vlen = *(uint32_t *)(r->map + off + 1);
-                uint8_t *val = (uint8_t *)(r->map + off + klen + 9);
-                cb(r, key, val, vlen, passthrough);
+                if (vlen) {
+                    uint8_t *val = (uint8_t *)(r->map + off + klen + 9);
+                    cb(r, key, val, vlen, passthrough);
+                }
                 if (search_off + skey_len >= sl) {
                     sl *= 2;
                     s = realloc(s, sl);
