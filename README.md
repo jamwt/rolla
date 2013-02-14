@@ -98,6 +98,32 @@ Rolla was designed to run on 32-bit systems, so offset
 values are typically unsigned 32-bit integers.  This limits
 total database size to ~4GB.
 
+Usage
+-----
+
+You can build a quick rolla_test program using redo:
+
+    https://github.com/apenwarr/redo
+
+But generally, just build redo.c into your project.  
+
+Recommended compiler flags are:
+
+    CFLAGS="-g -Wall -Werror -pedantic -std=gnu99 -O2 -fno-strict-aliasing"
+
+See `rolla.h` for API.  set, get, del, sync, create, close, iter.  It's
+a key/value storage engine!
+
+Iteration Note
+--------------
+
+If you change values (set or del) in `rolla_iter()`, make
+sure to pass *copies* of keys and values to set and del.  The
+key and value given to you by rolla are being borrowed from the
+mmaped file, and if the memory mapped region should move due to
+database growth caused by your mutation, those pointers will
+become invalid.
+
 Benchmarks
 ----------
 
