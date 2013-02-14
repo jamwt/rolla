@@ -16,10 +16,11 @@ Features
    in write-recency order
  * An idle (but fully loaded) database uses < 40kB of memory with
    default tuning parameters
- * Database files compact on close, so amortized disk use is O(keys)
+ * Database files can compact on close, so amortized disk use is O(keys)
  * A key enumeration interface is supported
  * On-disk representation has only 10 bytes of overhead for each
    key/value pair
+ * Already in use on millions of iOS and Android devices (armv7)
 
 Caveats
 -------
@@ -42,12 +43,60 @@ Caveats
    the operating system's schedule.  Some data that was not totally
    committed to the backing hardware could be lost if system failure
    happened (though the database will come up cleanly with a subset of
-   records, "repair" is never necessary)
+   records, "repair" is never necessary).  Applications can
+   call rolla_sync() if they want to force msync more often.
+ * A database created with a certain bucket count must always be
+   used with that bucket count.  The bucket count cannot change.
 
 Design
 ------
 
-TBD
+Rolla has a very simple design.
+
+When a rolla database is created, an array of buckets is allocated
+(by default 8192).  Database keys are hashed onto these buckets.
+The bucket values contain the offset to the _last_ entry in the
+file on disk that contains a key that was hashed into that bucket.
+
+On a read, this last value is checked.  If the key matches, the
+value is returned; otherwise, the record at this offset in the
+file contains a link back to the *previous* offset in this bucket,
+and so on.  Traversal continues until a record is encountered
+with a sentinel value that indicates there are no more records
+in this bucket.  This is why misses (key not found) are
+expensive in rolla.
+
+A write is simply a matter of overwriting the in-memory bucket
+value to point to the current EOF marker in the on-disk file,
+then taking the old value from this bucket and writing it out
+to the disk as the previous link in the chain, along with the
+new key and value.  In this way, writes are always appends.
+
+Mutating the same key over and over again will grow the
+database without bound.  `rolla_close()` takes a `compress`
+flag that will walk the database and write a new version
+with only the current values for each key.  It is important
+to close and compress active rolla databases regularly to
+both preserve disk space and prevent them from exceeding
+their 4GB limit.  Compaction is done in a crash-safe manner
+using a tempfile and `rename()`.
+
+When a database is reloaded, the file is walked and the
+bucket array is re-populated with the final offsets.  Any
+partial records are truncated in case of a crash.
+
+Rolla uses the `mmap()` syscall to memory-map this file as
+an array of records (C structs).
+
+Moving the NUMBUCKETS constant up and down can tune rolla
+for different expected key counts.  Clearly, larger bucket
+counts result in fewer seeks on disk because only a
+very few keys will map to that bucket, and link walking is
+minimal or absent.
+
+Rolla was designed to run on 32-bit systems, so offset
+values are typically unsigned 32-bit integers.  This limits
+total database size to ~4GB.
 
 Benchmarks
 ----------
