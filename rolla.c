@@ -14,6 +14,15 @@
 #define MMAP_OVERFLOW (10 * 1024)
 #define NO_BACKTRACE ((uint32_t)0xffffffff)
 
+struct rolla {
+    uint32_t offsets[NUMBUCKETS];
+    int mapfd;
+    char *path;
+    uint8_t *map;
+    int mmap_alloc;
+    int eof;
+};
+
 static uint32_t jenkins_one_at_a_time_hash(char *key, size_t len);
 
 #define hash jenkins_one_at_a_time_hash
