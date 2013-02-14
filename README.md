@@ -166,4 +166,4 @@ Benchmarks
 Author
 ------
 
-Jamie Turner <jamie@bu.mp>
+Jamie Turner <jamie@bu.mp> and others at Bump Technologies, Inc.
