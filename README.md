@@ -101,13 +101,14 @@ total database size to ~4GB.
 Usage
 -----
 
-You can build a quick rolla_test program using redo:
+You can build a quick rolla_test program using redo.  Install this:
 
     https://github.com/apenwarr/redo
 
-But generally, just build redo.c into your project.  
+... then type `redo` in this repository root.
 
-Recommended compiler flags are:
+But generally, just build redo.c into your project.  Recommended
+compiler flags are:
 
     CFLAGS="-g -Wall -Werror -pedantic -std=gnu99 -O2 -fno-strict-aliasing"
 
