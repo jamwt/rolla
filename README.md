@@ -119,8 +119,8 @@ Iteration Note
 --------------
 
 If you change values (set or del) in `rolla_iter()`, make
-sure to pass *copies* of keys and values to set and del.  The
-key and value given to you by rolla are being borrowed from the
+sure to pass *copies* of keys to set and del.  The
+keys given to you by rolla are being borrowed from the
 mmaped file, and if the memory mapped region should move due to
 database growth caused by your mutation, those pointers will
 become invalid.
