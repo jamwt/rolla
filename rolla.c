@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -137,7 +138,12 @@ void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen) {
         msync(r->map, r->mmap_alloc, MS_SYNC);
         int s = munmap(r->map, r->mmap_alloc);
         assert(!s);
-        r->mmap_alloc += (r->eof + step) * 2;
+        uint64_t new_size = r->mmap_alloc + ((r->eof + step) * 2);
+        if (new_size > UINT_MAX) {
+            assert(r->mmap_alloc != UINT_MAX);
+            new_size = UINT_MAX;
+        }
+        r->mmap_alloc = new_size;
         s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
         assert(!s);
         r->map = (uint8_t *)mmap(
