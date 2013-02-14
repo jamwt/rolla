@@ -107,7 +107,7 @@ You can build a quick rolla_test program using redo.  Install this:
 
 ... then type `redo` in this repository root.
 
-But generally, just build redo.c into your project.  Recommended
+But generally, just build rolla.c into your project.  Recommended
 compiler flags are:
 
     CFLAGS="-g -Wall -Werror -pedantic -std=gnu99 -O2 -fno-strict-aliasing"
