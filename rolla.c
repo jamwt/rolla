@@ -58,38 +58,42 @@ static void rolla_load(rolla *r) {
     }
 
     r->map = NULL;
-    r->mmap_alloc = r->eof;
-    r->map = (uint8_t *)mmap(
-        NULL, r->mmap_alloc, PROT_READ, MAP_PRIVATE, r->mapfd, 0);
-    assert(r->map);
 
-    uint8_t *p = r->map;
-    uint32_t off = 0;
-    while (1) {
-        if (off + 9 > r->eof) {
-            r->eof = off;
-            break;
+    if (r->eof) {
+
+        r->mmap_alloc = r->eof;
+        r->map = (uint8_t *)mmap(
+            NULL, r->mmap_alloc, PROT_READ, MAP_PRIVATE, r->mapfd, 0);
+        assert(r->map);
+
+        uint8_t *p = r->map;
+        uint32_t off = 0;
+        while (1) {
+            if (off + 9 > r->eof) {
+                r->eof = off;
+                break;
+            }
+            unsigned char klen = *(uint8_t *)p;
+            uint32_t vlen = *(uint32_t *)(p + 1);
+            uint32_t last = *(uint32_t *)(p + 5);
+            uint32_t jump = 9 + klen + vlen;
+
+            if (klen == 0 || (off + jump > r->eof)) {
+                r->eof = off;
+                break;
+            }
+
+            char *key = (char *)(p + 9);
+
+            uint32_t prev = rolla_index_keyval(r, key, off);
+            assert(prev == last);
+
+            off += jump;
+            p += jump;
         }
-        unsigned char klen = *(uint8_t *)p;
-        uint32_t vlen = *(uint32_t *)(p + 1);
-        uint32_t last = *(uint32_t *)(p + 5);
-        uint32_t jump = 9 + klen + vlen;
 
-        if (klen == 0 || (off + jump > r->eof)) {
-            r->eof = off;
-            break;
-        }
-
-        char *key = (char *)(p + 9);
-
-        uint32_t prev = rolla_index_keyval(r, key, off);
-        assert(prev == last);
-
-        off += jump;
-        p += jump;
+        munmap(r->map, r->mmap_alloc);
     }
-
-    munmap(r->map, r->mmap_alloc);
 
     r->mmap_alloc = r->eof + MMAP_OVERFLOW;
     s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
