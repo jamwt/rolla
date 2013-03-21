@@ -22,8 +22,8 @@ struct rolla {
     int mapfd;
     char *path;
     uint8_t *map;
-    int mmap_alloc;
-    int eof;
+    uint32_t mmap_alloc;
+    uint32_t eof;
     uint8_t cache[CACHE_SIZE];
     int cache_used;
 };
