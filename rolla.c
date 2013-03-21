@@ -9,10 +9,13 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #define MMAP_OVERFLOW (10 * 1024)
 #define NO_BACKTRACE ((uint32_t)0xffffffff)
+#define CACHE_SIZE (32 * 1024)
+#define DEBUG_PRINT_TRUNCATE 1
 
 struct rolla {
     uint32_t offsets[NUMBUCKETS];
@@ -21,7 +24,25 @@ struct rolla {
     uint8_t *map;
     int mmap_alloc;
     int eof;
+    uint8_t cache[CACHE_SIZE];
+    int cache_used;
 };
+
+static void rolla_remap(rolla *r) {
+    if (r->map) {
+        msync(r->map, r->mmap_alloc, MS_SYNC);
+        int s = munmap(r->map, r->mmap_alloc);
+        assert(!s);
+    }
+    r->mmap_alloc = r->eof;
+    if (r->mmap_alloc) {
+        r->map = (uint8_t *)mmap(
+            NULL, r->mmap_alloc, PROT_READ, MAP_SHARED, r->mapfd, 0);
+    } else {
+        r->map = NULL;
+    }
+    r->cache_used = 0;
+}
 
 static uint32_t jenkins_one_at_a_time_hash(char *key, size_t len);
 
@@ -57,19 +78,21 @@ static void rolla_load(rolla *r) {
         r->eof = 0;
     }
 
-    r->map = NULL;
+    rolla_remap(r);
 
-    if (r->eof) {
-
-        r->mmap_alloc = r->eof;
-        r->map = (uint8_t *)mmap(
-            NULL, r->mmap_alloc, PROT_READ, MAP_PRIVATE, r->mapfd, 0);
-        assert(r->map);
+    if (r->map) {
+        int save_eof = r->eof;
 
         uint8_t *p = r->map;
         uint32_t off = 0;
         while (1) {
+            if (off == r->eof) {
+                break; /* no recovery, clean shutdown */
+            }
             if (off + 9 > r->eof) {
+#if(DEBUG_PRINT_TRUNCATE)
+                fprintf(stderr, "rolla: recovering truncated db!\n");
+#endif
                 r->eof = off;
                 break;
             }
@@ -79,6 +102,9 @@ static void rolla_load(rolla *r) {
             uint32_t jump = 9 + klen + vlen;
 
             if (klen == 0 || (off + jump > r->eof)) {
+#if(DEBUG_PRINT_TRUNCATE)
+                fprintf(stderr, "rolla: recovering truncated db!\n");
+#endif
                 r->eof = off;
                 break;
             }
@@ -92,17 +118,14 @@ static void rolla_load(rolla *r) {
             p += jump;
         }
 
-        munmap(r->map, r->mmap_alloc);
+        if (save_eof != r->eof) {
+            s = ftruncate(r->mapfd, (off_t)r->eof);
+            assert(!s);
+            rolla_remap(r);
+        }
+
+        lseek(r->mapfd, r->eof, SEEK_SET);
     }
-
-    r->mmap_alloc = r->eof + MMAP_OVERFLOW;
-    s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
-    assert(!s);
-
-    r->map = (uint8_t *)mmap(
-        NULL, r->mmap_alloc, PROT_READ | PROT_WRITE, MAP_SHARED, r->mapfd, 0);
-
-    assert(r->map);
 }
 
 rolla * rolla_create(char *path) {
@@ -110,6 +133,7 @@ rolla * rolla_create(char *path) {
     r->path = malloc(strlen(path) + 1);
     strcpy(r->path, path);
     r->mmap_alloc = 0;
+    r->cache_used = 0;
     memset(r->offsets, 0xff, NUMBUCKETS * sizeof(uint32_t));
 
     rolla_load(r);
@@ -121,7 +145,12 @@ uint8_t * rolla_get(rolla *r, char *key, uint32_t *len) {
     uint32_t off = rolla_index_lookup(r, key);
 
     while (off != NO_BACKTRACE) {
-        uint8_t *p = &r->map[off];
+        uint8_t *p;
+        if (off >= r->mmap_alloc) {
+            p = &r->cache[off - r->mmap_alloc];
+        } else {
+            p = &r->map[off];
+        }
         uint8_t klen = *(uint8_t *)p;
         if (!strncmp((char *)(p + 9), key, klen)) {
             uint32_t vlen = *(uint32_t *)(p + 1);
@@ -140,41 +169,41 @@ uint8_t * rolla_get(rolla *r, char *key, uint32_t *len) {
 }
 
 void rolla_sync(rolla *r) {
-    int s = msync(r->map, r->mmap_alloc, MS_SYNC);
+    int s = fsync(r->mapfd);
     assert(!s);
 }
 
 void rolla_set(rolla *r, char *key, uint8_t *val, uint32_t vlen) {
     uint8_t klen = strlen(key) + 1;
     uint32_t step = 9 + klen + vlen;
-    if (r->eof + step > r->mmap_alloc) {
-        msync(r->map, r->mmap_alloc, MS_SYNC);
-        int s = munmap(r->map, r->mmap_alloc);
-        assert(!s);
-        uint64_t new_size = r->mmap_alloc + ((r->eof + step) * 2);
-        if (new_size > UINT_MAX) {
-            assert(r->mmap_alloc != UINT_MAX);
-            new_size = UINT_MAX;
-        }
-        r->mmap_alloc = new_size;
-        s = ftruncate(r->mapfd, (off_t)r->mmap_alloc);
-        assert(!s);
-        r->map = (uint8_t *)mmap(
-            NULL, r->mmap_alloc, PROT_READ | PROT_WRITE, MAP_SHARED, r->mapfd, 0);
-        /* TODO mremap() on linux */
-    }
-
+    /* write to the mapfd */
     uint32_t last = rolla_index_keyval(r, key, r->eof);
-    uint8_t *p = &r->map[r->eof];
+    struct iovec iov[] = {
+        {&klen, sizeof(uint8_t)},
+        {&vlen, sizeof(uint32_t)},
+        {&last, sizeof(uint32_t)},
+        {key, klen},
+        {val, vlen}};
 
-    *((uint8_t *)p) = klen;
-    *((uint32_t *)(p + 1)) = vlen;
-    *((uint32_t *)(p + 5)) = last;
-    memmove(p + 9, key, klen);
-    if (vlen)
-        memmove(p + 9 + klen, val, vlen);
-
+    int bwrite = writev(r->mapfd, iov, 5);
+    assert(bwrite == step);
     r->eof += step;
+
+    if (r->cache_used + step > CACHE_SIZE) {
+        rolla_remap(r);
+    }
+    else {
+        /* write to trailing cache */
+        uint8_t *p = &r->cache[r->cache_used];
+
+        *((uint8_t *)p) = klen;
+        *((uint32_t *)(p + 1)) = vlen;
+        *((uint32_t *)(p + 5)) = last;
+        memmove(p + 9, key, klen);
+        if (vlen)
+            memmove(p + 9 + klen, val, vlen);
+        r->cache_used += step;
+    }
 }
 
 void rolla_del(rolla *r, char *key) {
@@ -186,6 +215,9 @@ void rolla_iter(rolla *r, rolla_iter_cb cb, void *passthrough) {
 
     int sl = 10 * 1024;
     char *s = realloc(NULL, sl);
+
+    rolla_remap(r); /* since we do not use the write-ahead cache */
+
     for (i = 0; i < NUMBUCKETS; i++) {
         uint32_t search_off = 0;
         s[0] = 0;
