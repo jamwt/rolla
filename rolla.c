@@ -12,7 +12,6 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-#define MMAP_OVERFLOW (10 * 1024)
 #define NO_BACKTRACE ((uint32_t)0xffffffff)
 #define CACHE_SIZE (32 * 1024)
 #define DEBUG_PRINT_TRUNCATE 1
