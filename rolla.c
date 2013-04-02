@@ -128,7 +128,7 @@ static void rolla_load(rolla *r) {
 }
 
 rolla * rolla_create(char *path) {
-    rolla *r = realloc(NULL, sizeof(rolla));
+    rolla *r = calloc(1, sizeof(rolla));
     r->path = malloc(strlen(path) + 1);
     strcpy(r->path, path);
     r->mmap_alloc = 0;
